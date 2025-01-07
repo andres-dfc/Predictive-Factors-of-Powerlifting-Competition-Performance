@@ -1,0 +1,1047 @@
+---
+title: 'Powerlifting Project: Descriptive Statistics'
+author: "Andrés De Freitas Carmona"
+date: "2025-01-03"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+header-includes:
+  - '<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">'
+---
+
+```{css, echo=FALSE}
+/* Minimalist style */
+.minimal-box {
+  font-family: 'Roboto', sans-serif;
+  font-size: 1.1em;
+  color: #333;
+  background-color: #e8f4fd;
+  padding: 15px;
+  border: 1px solid #333;
+  margin-bottom: 15px;
+  border-radius: 5px;
+}
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message=FALSE)
+```
+
+# Contextualizing the Sport: Powerlifting's Descriptive Analysis
+
+<div class="minimal-box">
+
+The descriptive analysis for this project serves one main purpose: **contextualize** how *Powerlifting* works and how its variables behave, especially to the public outside of the sport.
+
+As a strength and weightlifting competitive sport, *Powerlifting* accounts for numerous measurable variables with meaningful value. Collecting data not only helps for accountability, it also allows to turn the sport into a subject of study. In this case, Powerlifting will be reviewed from a Data Science perspective.
+
+Glossary of variables:
+
+- **IPF**: Stands for International Powerlifting Federation, currently one of the most important in the sport.
+- **Equipment**: There are two types of equipment, Raw and Single-Ply, in the IPF. Essentially, the equipment determines the conditions in which athletes compete.
+- **Division**: Age groups where athletes compete. 
+- **Weight class**: Weight categories based on athletes' body weight.
+- **TotalKg**: Total weight lifted by an athlete in a competition.
+- **Federation**: Each federation has its own equipment rules, with different divisions and weight classes.
+- **MeetName**: Name of the competition.
+- **Goodlift points (GL)**: A measure of athletes' performance based on their body weight and other coefficients.
+
+
+IPF website for more info: www.powerlifting.sport
+
+</div>
+
+
+# 1. Libraries
+
+```{r , warning=FALSE, message=FALSE}
+
+library(readr)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(tidyr)
+
+```
+
+
+# 2. Data loading
+
+<div class="minimal-box">
+
+The data was downloaded from openpowerlifting.org on January 4th, 2025.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+
+openpowerliftingdata <- read_csv("C:/Users/andre/OneDrive/Escritorio/TFM/openpowerliftingdata3.csv")
+
+```
+
+# 3. Data division
+
+<div class="minimal-box">
+
+1. Data is split in female and male data sets, allowing for better data management.
+2. Data has been filtered for the International Powerlifting Federation (IPF), one of the most important federations in the sport.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+
+ipf_male_data <- openpowerliftingdata %>% filter(Federation == "IPF", Sex == "M")
+ipf_female_data <- openpowerliftingdata %>% filter(Federation == "IPF", Sex == "F")
+
+```
+
+# 4. Data cleaning
+
+### 4.1. Convert variables to factors.
+
+
+```{r , warning=FALSE, message=FALSE}
+
+ipf_male_data <- ipf_male_data %>%
+  mutate(
+    WeightClassKg = as.factor(WeightClassKg),
+    Division = as.factor(Division),
+    Equipment = as.factor(Equipment)
+  )
+
+ipf_female_data <- ipf_female_data %>%
+  mutate(
+    WeightClassKg = as.factor(WeightClassKg),
+    Division = as.factor(Division),
+    Equipment = as.factor(Equipment)
+  )
+
+```
+
+
+### 4.2. Classifying competitions by movements.
+
+<div class="minimal-box">
+
+Not all competitions host all three movements in their events. There are either one or three movement competitions.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+
+# Male
+
+ipf_male_data <- ipf_male_data %>%
+  mutate(
+    BooleanSquat = ifelse(
+      is.na(Bench1Kg) & is.na(Bench2Kg) & is.na(Bench3Kg) & is.na(Bench4Kg) & is.na(Best3BenchKg) &
+        is.na(Deadlift1Kg) & is.na(Deadlift2Kg) & is.na(Deadlift3Kg) & is.na(Deadlift4Kg) & is.na(Best3DeadliftKg) &
+        (!is.na(Squat1Kg) | !is.na(Squat2Kg) | !is.na(Squat3Kg) | !is.na(Squat4Kg) | !is.na(Best3SquatKg)), 
+      1, 0
+    ),
+    BooleanBench = ifelse(
+      is.na(Squat1Kg) & is.na(Squat2Kg) & is.na(Squat3Kg) & is.na(Squat4Kg) & is.na(Best3SquatKg) &
+        is.na(Deadlift1Kg) & is.na(Deadlift2Kg) & is.na(Deadlift3Kg) & is.na(Deadlift4Kg) & is.na(Best3DeadliftKg) &
+        (!is.na(Bench1Kg) | !is.na(Bench2Kg) | !is.na(Bench3Kg) | !is.na(Bench4Kg) | !is.na(Best3BenchKg)), 
+      1, 0
+    ),
+    BooleanDeadlift = ifelse(
+      is.na(Squat1Kg) & is.na(Squat2Kg) & is.na(Squat3Kg) & is.na(Squat4Kg) & is.na(Best3SquatKg) &
+        is.na(Bench1Kg) & is.na(Bench2Kg) & is.na(Bench3Kg) & is.na(Bench4Kg) & is.na(Best3BenchKg) &
+        (!is.na(Deadlift1Kg) | !is.na(Deadlift2Kg) | !is.na(Deadlift3Kg) | !is.na(Deadlift4Kg) | !is.na(Best3DeadliftKg)), 
+      1, 0
+    ),
+    BooleanDisq = ifelse(
+      (is.na(Squat1Kg) & is.na(Squat2Kg) & is.na(Squat3Kg) & is.na(Squat4Kg) & is.na(Best3SquatKg) &
+         is.na(Bench1Kg) & is.na(Bench2Kg) & is.na(Bench3Kg) & is.na(Bench4Kg) & is.na(Best3BenchKg) &
+         is.na(Deadlift1Kg) & is.na(Deadlift2Kg) & is.na(Deadlift3Kg) & is.na(Deadlift4Kg) & is.na(Best3DeadliftKg)) | 
+        Place == "DQ",
+      1, 0
+    )
+  )
+
+# Female
+
+ipf_female_data <- ipf_female_data %>%
+  mutate(
+    BooleanSquat = ifelse(
+      is.na(Bench1Kg) & is.na(Bench2Kg) & is.na(Bench3Kg) & is.na(Bench4Kg) & is.na(Best3BenchKg) &
+        is.na(Deadlift1Kg) & is.na(Deadlift2Kg) & is.na(Deadlift3Kg) & is.na(Deadlift4Kg) & is.na(Best3DeadliftKg) &
+        (!is.na(Squat1Kg) | !is.na(Squat2Kg) | !is.na(Squat3Kg) | !is.na(Squat4Kg) | !is.na(Best3SquatKg)), 
+      1, 0
+    ),
+    BooleanBench = ifelse(
+      is.na(Squat1Kg) & is.na(Squat2Kg) & is.na(Squat3Kg) & is.na(Squat4Kg) & is.na(Best3SquatKg) &
+        is.na(Deadlift1Kg) & is.na(Deadlift2Kg) & is.na(Deadlift3Kg) & is.na(Deadlift4Kg) & is.na(Best3DeadliftKg) &
+        (!is.na(Bench1Kg) | !is.na(Bench2Kg) | !is.na(Bench3Kg) | !is.na(Bench4Kg) | !is.na(Best3BenchKg)), 
+      1, 0
+    ),
+    BooleanDeadlift = ifelse(
+      is.na(Squat1Kg) & is.na(Squat2Kg) & is.na(Squat3Kg) & is.na(Squat4Kg) & is.na(Best3SquatKg) &
+        is.na(Bench1Kg) & is.na(Bench2Kg) & is.na(Bench3Kg) & is.na(Bench4Kg) & is.na(Best3BenchKg) &
+        (!is.na(Deadlift1Kg) | !is.na(Deadlift2Kg) | !is.na(Deadlift3Kg) | !is.na(Deadlift4Kg) | !is.na(Best3DeadliftKg)), 
+      1, 0
+    ),
+    BooleanDisq = ifelse(
+      (is.na(Squat1Kg) & is.na(Squat2Kg) & is.na(Squat3Kg) & is.na(Squat4Kg) & is.na(Best3SquatKg) &
+         is.na(Bench1Kg) & is.na(Bench2Kg) & is.na(Bench3Kg) & is.na(Bench4Kg) & is.na(Best3BenchKg) &
+         is.na(Deadlift1Kg) & is.na(Deadlift2Kg) & is.na(Deadlift3Kg) & is.na(Deadlift4Kg) & is.na(Best3DeadliftKg)) | 
+        Place == "DQ",
+      1, 0
+    )
+  )
+
+```
+
+### 4.3. Removing competitions with only one movement.
+
+<div class="minimal-box">
+
+An important step in the data cleaning process of this project is the <u>removal of competitions that do not execute the three movements</u>. This criterion is a fundamental principle of the project and will be discussed later.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+
+# Male
+
+ipf_male_data_clean <- ipf_male_data %>%
+  filter(
+    (BooleanSquat + BooleanBench + BooleanDeadlift != 1) & 
+      (BooleanDisq == 0)
+  )
+
+# Female
+
+ipf_female_data_clean <- ipf_female_data %>%
+  filter(
+    (BooleanSquat + BooleanBench + BooleanDeadlift != 1) & 
+      (BooleanDisq == 0)
+  )
+
+```
+
+
+
+### 4.4. Removing boolean variables created, since they no longer serve any purpose.
+
+
+```{r , warning=FALSE, message=FALSE}
+
+ipf_male_data_clean <- ipf_male_data_clean %>%
+  select(-BooleanSquat, -BooleanBench, -BooleanDeadlift, -BooleanDisq)
+
+ipf_female_data_clean <- ipf_female_data_clean %>%
+  select(-BooleanSquat, -BooleanBench, -BooleanDeadlift, -BooleanDisq)
+
+```
+
+
+### 4.5. Removing old divisions.
+
+<div class="minimal-box">
+
+**Divisions** evolved through time. Nowadays, the IPF ceased the use of the following. 
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+
+excluded_divisions <- c("Light", "Middle", "Heavy", "Super", "SOI", "SuperHeavy")
+
+ipf_male_data_clean <- ipf_male_data_clean %>%
+  filter(!Division %in% excluded_divisions)
+
+ipf_female_data_clean <- ipf_female_data_clean %>%
+  filter(!Division %in% excluded_divisions)
+
+```
+
+
+### 4.6. Removing disqualified athletes.
+
+
+```{r , warning=FALSE, message=FALSE}
+
+excluded_places <- c("DD", "DQ", "G")
+
+ipf_male_data_clean <- ipf_male_data_clean %>%
+  filter(!Place %in% excluded_places)
+
+ipf_female_data_clean <- ipf_female_data_clean %>%
+  filter(!Place %in% excluded_places)
+```
+
+  
+# 5. Descriptive Statistics for the Powerlifting Project
+
+
+### 5.1. Number of athletes by equipment and sex.
+
+<div class="minimal-box">
+
+Men represent the majority of athletes in the sport. However, women do not fall behind in the **Raw** equipment section.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+combined_data_clean <- bind_rows(
+  ipf_male_data_clean %>% mutate(Sex = "Male"),
+  ipf_female_data_clean %>% mutate(Sex = "Female")
+)
+
+combined_equipment_plot <- combined_data_clean %>%
+  group_by(Sex, Equipment) %>%
+  summarise(Count = n()) %>%
+  ggplot(aes(x = Equipment, y = Count, fill = Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = Count), position = position_dodge(width = 0.9), vjust = -0.5, size = 3) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  labs(title = "Number of Athletes by Equipment and Sex",
+       x = "Equipment",
+       y = NULL) +  
+  theme(
+    panel.grid = element_blank(),  
+    legend.position = "none",      
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(), 
+    axis.ticks.y = element_blank() 
+  ) +
+  facet_wrap(~Sex)
+
+
+print(combined_equipment_plot)
+```
+
+
+### 5.2. Divisions by equipment.
+
+<div class="minimal-box">
+
+Divisions in both sides are similarly distributed in terms of number of athletes. The **Open** division is the most important, followed by the **Juniors**.  
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+division_order <- c("Sub-Juniors", "Juniors", "Open", "Masters 1", "Masters 2", "Masters 3", "Masters 4")
+
+ipf_male_data_clean <- ipf_male_data_clean %>%
+  mutate(Division = factor(Division, levels = division_order))
+
+ipf_female_data_clean <- ipf_female_data_clean %>%
+  mutate(Division = factor(Division, levels = division_order))
+
+
+# Raw
+
+raw_combined_plot <- combined_data_clean %>%
+  filter(Equipment == "Raw", !is.na(Division)) %>%
+  group_by(Sex, Division) %>%
+  summarise(Count = n()) %>%
+  mutate(Division = factor(Division, levels = division_order)) %>%
+  ggplot(aes(x = Division, y = Count, fill = Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = Count), position = position_dodge(width = 0.9), vjust = -0.5, size = 3) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  labs(title = "Number of Athletes By Division in Raw Equipment",
+       x = "Division",
+       y = NULL) +  
+  theme(
+    panel.grid = element_blank(),        
+    legend.position = "none",            
+    axis.title.y = element_blank(),      
+    axis.text.y = element_blank(),       
+    axis.ticks.y = element_blank(),      
+    axis.text.x = element_text(angle = 45, hjust = 1)  
+  ) +
+  facet_wrap(~Sex)  
+
+print(raw_combined_plot)
+
+
+# Single-ply
+
+single_ply_combined_plot <- combined_data_clean %>%
+  filter(Equipment == "Single-ply" & !is.na(Division)) %>%
+  group_by(Sex, Division) %>%
+  summarise(Count = n()) %>%
+  mutate(Division = factor(Division, levels = division_order)) %>%
+  ggplot(aes(x = Division, y = Count, fill = Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = Count), position = position_dodge(width = 0.9), vjust = -0.5, size = 3) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  labs(title = "Number of Athletes By Division in Single-ply Equipment",
+       x = "Division",
+       y = NULL) +  
+  theme(
+    panel.grid = element_blank(),        
+    legend.position = "none",            
+    axis.title.y = element_blank(),      
+    axis.text.y = element_blank(),       
+    axis.ticks.y = element_blank(),      
+    axis.text.x = element_text(angle = 45, hjust = 1)  
+  ) +
+  facet_wrap(~Sex)  
+
+print(single_ply_combined_plot)
+
+```
+
+
+### 5.3. Weight classes by division and equipment from 2011 and 2018.
+
+<div class="minimal-box">
+
+As there are many divisions, only the top 3 divisions by number of athletes will taken into account. Weight classes changed in 2011 and 2018, which will the only weight classes taken into account for better representation.
+
+Number of athletes by weight class in the top 3 divisions with **Raw** equipment.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+
+# Ordering weight classes.
+
+male_weight_order <- c("52", "53", "56", "59", "60", "66", "67.5", "74", "75", "82.5", "82.5+", "83", "90", "90+", "93", "100", "100+", "105", "105+", "110", "110+", "120", "120+", "125", "125+")
+
+ipf_male_data_clean <- ipf_male_data_clean %>%
+  mutate(WeightClassKg = factor(WeightClassKg, levels = male_weight_order))
+
+female_weight_order <- c("43", "44", "47", "48", "52", "56", "57", "60", "63", "67.5", "67.5+", "69", "72", "72+", "75", "75+", "76", "76+", "82.5", "82.5+", "84", "84+", "90", "90+")
+
+ipf_female_data_clean <- ipf_female_data_clean %>%
+  mutate(WeightClassKg = factor(WeightClassKg, levels = female_weight_order))
+
+# Filtering top 3 divisions.
+
+get_top_divisions <- function(data, equipment) {
+  data %>%
+    filter(Equipment == equipment) %>%
+    group_by(Division) %>%
+    summarise(Count = n(), .groups = 'drop') %>%
+    arrange(desc(Count)) %>%
+    slice_head(n = 3) %>%
+    pull(Division)
+}
+
+top_divisions_male_raw <- get_top_divisions(ipf_male_data_clean, "Raw")
+top_divisions_male_single_ply <- get_top_divisions(ipf_male_data_clean, "Single-ply")
+top_divisions_female_raw <- get_top_divisions(ipf_female_data_clean, "Raw")
+top_divisions_female_single_ply <- get_top_divisions(ipf_female_data_clean, "Single-ply")
+
+filter_top_divisions <- function(data, divisions) {
+  data %>%
+    filter(Division %in% divisions)
+}
+
+filtered_male_raw <- filter_top_divisions(ipf_male_data_clean, top_divisions_male_raw)
+filtered_male_single_ply <- filter_top_divisions(ipf_male_data_clean, top_divisions_male_single_ply)
+filtered_female_raw <- filter_top_divisions(ipf_female_data_clean, top_divisions_female_raw)
+filtered_female_single_ply <- filter_top_divisions(ipf_female_data_clean, top_divisions_female_single_ply)
+
+# 2011
+
+weight_class_plot_2011 <- function(data, divisions, equipment, sex) {
+  
+  division_colors <- c(
+    "Sub-Juniors" = "#E41A1C",  
+    "Juniors" = "#377EB8",      
+    "Open" = "#4DAF4A",         
+    "Masters 1" = "#984EA3"     
+  )
+  
+  data %>%
+    filter(Division %in% divisions, 
+           Equipment == equipment, 
+           !is.na(WeightClassKg), 
+           Date >= as.Date("2011-01-01")) %>%  
+    group_by(Division, WeightClassKg) %>%
+    summarise(Count = n(), .groups = 'drop') %>%
+    ggplot(aes(x = WeightClassKg, y = Count, fill = Division)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    scale_fill_manual(values = division_colors) +
+    theme_minimal() +
+    labs(title = paste("Number of", sex, "Athletes in Top 3 Divisions with", equipment, "\nEquipment by Weight Class (2011 Onwards)"),
+         x = "Weight Class (Kg)",
+         y = "Count of Athletes") +
+    theme(
+      panel.grid = element_blank(),                
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.title = element_blank()
+    )
+}
+
+
+plot_male_raw_2011 <- weight_class_plot_2011(filtered_male_raw, top_divisions_male_raw, "Raw", "Male")
+print(plot_male_raw_2011)
+
+plot_male_single_ply_2011 <- weight_class_plot_2011(filtered_male_single_ply, top_divisions_male_single_ply, "Single-ply", "Male")
+print(plot_male_single_ply_2011)
+
+plot_female_raw_2011 <- weight_class_plot_2011(filtered_female_raw, top_divisions_female_raw, "Raw", "Female")
+print(plot_female_raw_2011)
+
+plot_female_single_ply_2011 <- weight_class_plot_2011(filtered_female_single_ply, top_divisions_female_single_ply, "Single-ply", "Female")
+print(plot_female_single_ply_2011)
+
+
+# 2018 
+
+weight_class_plot_2018 <- function(data, divisions, equipment, sex) {
+  
+  division_colors <- c(
+    "Sub-Juniors" = "#E41A1C",  
+    "Juniors" = "#377EB8",      
+    "Open" = "#4DAF4A",         
+    "Masters 1" = "#984EA3"     
+  )
+  
+  data %>%
+    filter(Division %in% divisions, 
+           Equipment == equipment, 
+           !is.na(WeightClassKg), 
+           Date >= as.Date("2018-01-01")) %>%  
+    group_by(Division, WeightClassKg) %>%
+    summarise(Count = n(), .groups = 'drop') %>%
+    ggplot(aes(x = WeightClassKg, y = Count, fill = Division)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    scale_fill_manual(values = division_colors) +
+    theme_minimal() +
+    labs(title = paste("Number of", sex, "Athletes in Top 3 Divisions with", equipment, "\nEquipment by Weight Class (2018 Onwards)"),
+         x = "Weight Class (Kg)",
+         y = "Count of Athletes") +
+    theme(
+      panel.grid = element_blank(),                
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.title = element_blank()
+    )
+}
+
+
+plot_male_raw_2018 <- weight_class_plot_2018(filtered_male_raw, top_divisions_male_raw, "Raw", "Male")
+print(plot_male_raw_2018)
+
+plot_male_single_ply_2018 <- weight_class_plot_2018(filtered_male_single_ply, top_divisions_male_single_ply, "Single-ply", "Male")
+print(plot_male_single_ply_2018)
+
+plot_female_raw_2018 <- weight_class_plot_2018(filtered_female_raw, top_divisions_female_raw, "Raw", "Female")
+print(plot_female_raw_2018)
+
+plot_female_single_ply_2018 <- weight_class_plot_2018(filtered_female_single_ply, top_divisions_female_single_ply, "Single-ply", "Female")
+print(plot_female_single_ply_2018)
+```
+
+
+### 5.4. Weight classes timeline.
+
+<div class="minimal-box">
+
+**Weight classes** have changed during the sport´s history. Here is a visual representation of how they have evolved.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+filtered_male <- ipf_male_data_clean %>%
+  filter(!is.na(WeightClassKg))
+
+filtered_female <- ipf_female_data_clean %>%
+  filter(!is.na(WeightClassKg))
+
+
+create_timeline_plot <- function(data, sex) {
+  data %>%
+    group_by(Year = as.integer(format(Date, "%Y")), WeightClassKg) %>%
+    summarise(Count = n(), .groups = 'drop') %>%
+    ggplot(aes(x = Year, y = WeightClassKg, group = WeightClassKg, color = WeightClassKg)) +
+    geom_line() +
+    geom_point() +
+    theme_minimal() +        
+    labs(title = paste("Timeline of Weight Classes for", sex, "Athletes Across All Divisions"),
+         x = "Year",
+         y = "Weight Class (Kg)") +        
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "none",       
+          panel.grid = element_blank(),   
+          panel.grid.major.x = element_line(color = "gray80"))
+}
+
+
+plot_male_timeline <- create_timeline_plot(filtered_male, "Male")
+plot_female_timeline <- create_timeline_plot(filtered_female, "Female")
+
+print(plot_male_timeline)
+print(plot_female_timeline)
+```
+
+
+### 5.5. Bodyweight density plot by sex (historical perspective).
+
+<div class="minimal-box">
+
+Historically, women´s **body weight** has been more concentrated than men´s. Women´s **weight classes** have been criticized as unrealistic for the context of the sport.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+combined_data <- bind_rows(
+  ipf_male_data_clean %>%
+    mutate(Sex = "Male"),
+  ipf_female_data_clean %>%
+    mutate(Sex = "Female")
+)
+
+density_bodyweight <- ggplot(combined_data, aes(x = BodyweightKg, fill = Sex)) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Density Plot of Body Weight by Sex",
+       x = "Body Weight (Kg)",
+       y = "Density") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(
+    legend.title = element_blank(),
+    panel.grid = element_blank()  
+  )
+
+print(density_bodyweight)
+```
+
+
+### 5.6. Bodyweight density plot from 2011 and 2018.
+
+<div class="minimal-box">
+
+As **weight classes** gain more athletes through time, spikes in the density plots can be visualized. 
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+# 2011
+
+ipf_male_data_2011_onwards <- ipf_male_data_clean %>%
+  filter(Date >= as.Date("2011-01-01"))
+
+ipf_female_data_2011_onwards <- ipf_female_data_clean %>%
+  filter(Date >= as.Date("2011-01-01"))
+
+combined_data_2011_onwards <- bind_rows(
+  ipf_male_data_2011_onwards %>%
+    mutate(Sex = "Male"),
+  ipf_female_data_2011_onwards %>%
+    mutate(Sex = "Female")
+)
+
+density_bodyweight_2011_onwards <- ggplot(combined_data_2011_onwards, aes(x = BodyweightKg, fill = Sex)) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Density Plot of Body Weight by Sex (2011 Onwards)",
+       x = "Body Weight (Kg)",
+       y = "Density") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(
+    legend.title = element_blank(),
+    panel.grid = element_blank()
+  )
+
+print(density_bodyweight_2011_onwards)
+
+
+# 2018
+
+ipf_male_data_2018_onwards <- ipf_male_data_clean %>%
+  filter(Date >= as.Date("2018-01-01"))
+
+ipf_female_data_2018_onwards <- ipf_female_data_clean %>%
+  filter(Date >= as.Date("2018-01-01"))
+
+combined_data_2018_onwards <- bind_rows(
+  ipf_male_data_2018_onwards %>%
+    mutate(Sex = "Male"),
+  ipf_female_data_2018_onwards %>%
+    mutate(Sex = "Female")
+)
+
+density_bodyweight_2018_onwards <- ggplot(combined_data_2018_onwards, aes(x = BodyweightKg, fill = Sex)) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Density Plot of Body Weight by Sex (2018 Onwards)",
+       x = "Body Weight (Kg)",
+       y = "Density") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(
+    legend.title = element_blank(),
+    panel.grid = element_blank()
+  )
+
+print(density_bodyweight_2018_onwards)
+```
+
+
+
+### 5.7. Boxplot of totals per weight class on Open division, Raw equipment, from 2011 and 2018.
+
+<div class="minimal-box">
+
+**Weight classes** and **TotalKg** lifted by athletes correlate positive. From a physics standpoint, a higher **body weight** allows to lift heavier.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+# 2011
+
+# Male
+
+ipf_male_data_2011_onwards_open <- ipf_male_data_clean %>%
+  filter(Date >= as.Date("2011-01-01") & Division == "Open") %>%
+  filter(!is.na(WeightClassKg))
+
+male_boxplot_2011_onwards_open <- ggplot(ipf_male_data_2011_onwards_open, aes(x = as.factor(WeightClassKg), y = TotalKg, fill = Equipment)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Boxplot of TotalKg by Weight Class for Male Athletes \n(2011 onwards, Open Division)",
+       x = "Weight Class (Kg)",
+       y = "TotalKg") +
+  scale_fill_brewer(palette = "Set2") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank()
+  )
+
+print(male_boxplot_2011_onwards_open)
+
+
+# Female
+
+ipf_female_data_2011_onwards_open <- ipf_female_data_clean %>%
+  filter(Date >= as.Date("2011-01-01") & Division == "Open") %>%
+  filter(!is.na(WeightClassKg))
+
+female_boxplot_2011_onwards_open <- ggplot(ipf_female_data_2011_onwards_open, aes(x = as.factor(WeightClassKg), y = TotalKg, fill = Equipment)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Boxplot of TotalKg by Weight Class for Female Athletes \n(2011 onwards, Open Division)",
+       x = "Weight Class (Kg)",
+       y = "TotalKg") +
+  scale_fill_brewer(palette = "Set2") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank()
+  )
+
+print(female_boxplot_2011_onwards_open)
+
+
+# 2018
+
+# Male
+
+ipf_male_data_2018_onwards_open <- ipf_male_data_clean %>% 
+  filter(Date >= as.Date("2018-01-01") & Division == "Open") %>%
+  filter(!is.na(WeightClassKg))
+
+male_boxplot_2018_onwards_open <- ggplot(ipf_male_data_2018_onwards_open, aes(x = as.factor(WeightClassKg), y = TotalKg, fill = Equipment)) +
+  geom_boxplot() +
+  theme_minimal() +
+labs(title = "Boxplot of TotalKg by Weight Class for Male Athletes \n(2018 onwards, Open Division)",
+     x = "Weight Class (Kg)",
+     y = "TotalKg") +
+  scale_fill_brewer(palette = "Set2") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank()
+  )
+
+print(male_boxplot_2018_onwards_open)
+
+
+# Female
+
+ipf_female_data_2018_onwards_open <- ipf_female_data_clean %>% 
+  filter(Date >= as.Date("2018-01-01") & Division == "Open") %>%
+  filter(!is.na(WeightClassKg))
+
+female_boxplot_2018_onwards_open <- ggplot(ipf_female_data_2018_onwards_open, aes(x = as.factor(WeightClassKg), y = TotalKg, fill = Equipment)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Boxplot of TotalKg by Weight Class for Female Athletes \n(2018 onwards, Open Division)",
+       x = "Weight Class (Kg)",
+       y = "TotalKg") +
+  scale_fill_brewer(palette = "Set2") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank()
+  )
+
+print(female_boxplot_2018_onwards_open)
+```
+
+
+### 5.8. Regression of totals by bodyweight, Open division, from 2011 onwards.
+
+<div class="minimal-box">
+
+Most of the athletes' **body weight** concentrates close to their **weight classes** limits. That is not the case for the higher **weight classes**. Since reach **body weights** beyond expected.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+# Male
+
+ipf_male_data_2011_onwards_open <- ipf_male_data_clean %>% 
+  filter(Date >= as.Date("2011-01-01") & Division == "Open")
+
+male_lm <- lm(TotalKg ~ BodyweightKg + Equipment, data = ipf_male_data_2011_onwards_open)
+
+male_regression_plot_2011_onwards_open <- ggplot(ipf_male_data_2011_onwards_open, aes(x = BodyweightKg, y = TotalKg, color = Equipment)) +
+  geom_point(alpha = 0.5, position = position_jitter(width = 0.2)) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = Equipment)) +
+  theme_minimal() +
+  labs(title = "Regression of TotalKg by BodyweightKg for Male Athletes \n(2011 onwards, Open Division)",
+       x = "Body Weight (Kg)",
+       y = "TotalKg") +
+  scale_color_brewer(palette = "Set2") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank()
+  )
+
+print(male_regression_plot_2011_onwards_open)
+
+
+# Female
+
+ipf_female_data_2011_onwards_open <- ipf_female_data_clean %>% 
+  filter(Date >= as.Date("2011-01-01") & Division == "Open")
+
+female_lm <- lm(TotalKg ~ BodyweightKg + Equipment, data = ipf_female_data_2011_onwards_open)
+
+female_regression_plot_2011_onwards_open <- ggplot(ipf_female_data_2011_onwards_open, aes(x = BodyweightKg, y = TotalKg, color = Equipment)) +
+  geom_point(alpha = 0.5, position = position_jitter(width = 0.2)) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = Equipment)) +
+  theme_minimal() +
+  labs(title = "Regression of TotalKg by BodyweightKg for Female Athletes \n(2011 onwards, Open Division)",
+       x = "Body Weight (Kg)",
+       y = "TotalKg") +
+  scale_color_brewer(palette = "Set2") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank()
+  )
+
+print(female_regression_plot_2011_onwards_open)
+
+```
+
+
+
+
+### 5.9. ANOVA of totals by weight class, Open division.
+
+<div class="minimal-box">
+
+An ANOVA is performed to verify inconsistencies of the **Totals** across **weight classes**. 
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+# Male
+
+ipf_male_data_2011_onwards_open <- ipf_male_data_clean %>% 
+  filter(Date >= as.Date("2011-01-01") & Division == "Open")
+
+anova_male_result <- aov(TotalKg ~ as.factor(WeightClassKg) * Equipment, data = ipf_male_data_2011_onwards_open)
+
+# Female
+
+ipf_female_data_2011_onwards_open <- ipf_female_data_clean %>% 
+  filter(Date >= as.Date("2011-01-01") & Division == "Open")
+
+anova_female_result <- aov(TotalKg ~ as.factor(WeightClassKg) * Equipment, data = ipf_female_data_2011_onwards_open)
+
+
+```
+
+
+### 5.10. Tukey's HSD. 
+
+<div class="minimal-box">
+
+Tukey´s Test suggests the female 69 and 72 **weight classes** present inconsistencies. A higher **weight class** should have higher means in the **TotalKg**, since they are correlated positively. The case must be studied separately.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+# Male
+
+tukey_male_result <- TukeyHSD(anova_male_result)
+
+# Female
+
+tukey_female_result <- TukeyHSD(anova_female_result)
+
+
+# Results of Tukey's Test.
+
+# Male
+
+tukey_male_weightclass <- as.data.frame(tukey_male_result$`as.factor(WeightClassKg)`)
+tukey_male_equipment <- as.data.frame(tukey_male_result$Equipment)
+tukey_male_interaction <- as.data.frame(tukey_male_result$`as.factor(WeightClassKg):Equipment`)
+
+tukey_male_weightclass$Comparison <- "WeightClass"
+tukey_male_equipment$Comparison <- "Equipment"
+tukey_male_interaction$Comparison <- "WeightClass:Equipment"
+
+tukey_male_weightclass$Pair <- rownames(tukey_male_weightclass)
+tukey_male_equipment$Pair <- rownames(tukey_male_equipment)
+tukey_male_interaction$Pair <- rownames(tukey_male_interaction)
+
+tukey_male_results <- rbind(tukey_male_weightclass, tukey_male_equipment, tukey_male_interaction)
+rownames(tukey_male_results) <- NULL
+
+
+# Female
+
+tukey_female_weightclass <- as.data.frame(tukey_female_result$`as.factor(WeightClassKg)`)
+tukey_female_equipment <- as.data.frame(tukey_female_result$Equipment)
+tukey_female_interaction <- as.data.frame(tukey_female_result$`as.factor(WeightClassKg):Equipment`)
+
+tukey_female_weightclass$Comparison <- "WeightClass"
+tukey_female_equipment$Comparison <- "Equipment"
+tukey_female_interaction$Comparison <- "WeightClass:Equipment"
+
+tukey_female_weightclass$Pair <- rownames(tukey_female_weightclass)
+tukey_female_equipment$Pair <- rownames(tukey_female_equipment)
+tukey_female_interaction$Pair <- rownames(tukey_female_interaction)
+
+tukey_female_results <- rbind(tukey_female_weightclass, tukey_female_equipment, tukey_female_interaction)
+rownames(tukey_female_results) <- NULL
+
+
+# Tukey's HSD graph: Comparison between weight classes.
+
+ggplot(tukey_female_weightclass, aes(x = Pair, y = diff)) +
+  geom_bar(stat = "identity", fill="#377EB8") +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.2) +
+  labs(
+    title = "Tukey HSD Results for Female Weight Class",
+    x = "Weight Class Comparison",
+    y = "Difference in Means"
+  ) +
+  theme_minimal(base_family = "sans") +  
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank(),        
+    legend.title = element_blank()       
+  )
+
+```
+
+
+### 5.11. Case study of female weight classes -69 & -72.
+
+<div class="minimal-box">
+
+Up until 2024, the **69 female weight class** did not surpass the **72 weight class** in number of athletes.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+# Number of female athletes on weight classes -69 & -72.
+
+ipf_female_69_72 <- ipf_female_data_clean %>%
+  filter(Date >= as.Date("2011-01-01") & 
+           WeightClassKg %in% c(69, 72))
+
+athlete_counts <- ipf_female_69_72 %>%
+  mutate(Year = as.numeric(format(Date, "%Y"))) %>%
+  group_by(Year, WeightClassKg) %>%
+  summarise(Count = n(), .groups = 'drop')
+
+
+ggplot(athlete_counts, aes(x = Year, y = Count, color = as.factor(WeightClassKg))) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Number of Female Athletes Competing in 69 kg and 72 kg Weight Classes \n(2011 Onwards)",
+       x = "Year",
+       y = "Number of Athletes",
+       color = "Weight Class (Kg)") +
+  theme_minimal() +
+  scale_color_brewer(palette = "Dark2") +
+  theme(
+    panel.grid = element_blank(),        
+    axis.line = element_line(color = "black"),  
+    panel.border = element_rect(color = "black", fill = NA),  
+    axis.ticks = element_line(color = "black")  
+  )
+```
+
+
+### 5.12. Average GL points per year in weight classes -69 & -72.
+
+<div class="minimal-box">
+
+Even though **69** is an inferior **weight class** and was introduced later, from the first time it was incorporated, the average **Goodlift** points were higher than the **72 weight class**, which has inconsistent results along the years. These results confirm that, despite the amount of athletes, the **72 weight class** was considerably less competitive than its successor. 
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+average_goodlift <- ipf_female_69_72 %>%
+  mutate(Year = as.numeric(format(Date, "%Y"))) %>%
+  group_by(Year, WeightClassKg) %>%
+  summarise(Average_Goodlift = mean(Goodlift, na.rm = TRUE), .groups = 'drop')
+
+
+ggplot(average_goodlift, aes(x = Year, y = Average_Goodlift, color = as.factor(WeightClassKg))) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Average Goodlift for Female Athletes in 69 kg and 72 kg Weight Classes \n(2011 Onwards)",
+       x = "Year",
+       y = "Average Goodlift",
+       color = "Weight Class (Kg)") +
+  theme_minimal() +
+  scale_color_brewer(palette = "Dark2") +
+  theme(
+    panel.grid = element_blank(),        
+    axis.line = element_line(color = "black"),  
+    panel.border = element_rect(color = "black", fill = NA),  
+    axis.ticks = element_line(color = "black")  
+  )
+```
+
+
+### 5.13. Density plot of totals by sex.
+
+<div class="minimal-box">
+
+**TotalKg** in **Single-ply equipment** is a bit flatter than **Raw**.
+
+</div>
+
+```{r , warning=FALSE, message=FALSE}
+ipf_male_data_2011_onwards_open <- ipf_male_data_clean %>%
+  filter(Date >= as.Date("2011-01-01") & Division == "Open")
+
+ipf_female_data_2011_onwards_open <- ipf_female_data_clean %>%
+  filter(Date >= as.Date("2011-01-01") & Division == "Open")
+
+combined_data_2011_onwards_open <- bind_rows(ipf_male_data_2011_onwards_open, ipf_female_data_2011_onwards_open)
+
+ggplot(combined_data_2011_onwards_open, aes(x = TotalKg, fill = Sex)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~ Equipment) +  
+  labs(title = "Density Plot of TotalKg for Male and Female Athletes \n(2011 Onwards, Open Division)",
+       x = "TotalKg",
+       y = "Density") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1",
+                    labels = c("M" = "Male", "F" = "Female")) +
+  theme(
+    panel.grid = element_blank()
+  )  
+```
+
+
